@@ -1,14 +1,15 @@
 #ifndef PINS_H
 #define PINS_H
-#if ESP32
+#include "heater.h"
 
+#if ESP32
 // Buttons are INPUT
 // byte btnReadPin(byte p){ return digitalRead(p);}
 #define I2C_SDA 21
 #define I2C_SCL 22
 #define SensorPin 23
 
-#define BuzzControlPin 18
+#define BuzzControlPin 33
 
 #define PumpControlPin  16
 #define HeatControlPin  17
@@ -16,7 +17,7 @@
 
 
 #define ButtonUpPin    32 // P1
-#define ButtonDownPin  33 // p0 NODEMCU_PIN_D4
+#define ButtonDownPin  18 // p0 NODEMCU_PIN_D4
 #define ButtonStartPin 25 //P3 NODEMCU_PIN_D5
 #define ButtonEnterPin  26 //P2 NODEMCU_PIN_D6
 
@@ -33,7 +34,8 @@ void btnPrepareRead(void){}
 // Heater, Pump, Buzz are OUTPUTs
 inline void setHeaterOut(byte v)
 {
-	digitalWrite (HeatControlPin, v);
+	heaterSerial.begin(9600);
+	heaterSerial.printf("TW%d\n", v * 3500);
 }
 
 inline void setPumpOut(byte v)

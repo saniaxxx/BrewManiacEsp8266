@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <pgmspace.h>
+#include "heater.h"
 
 #if ESP32
 #include <WiFi.h>
@@ -1474,6 +1475,7 @@ void setup(void){
   	DebugOut("Start..\n");
   	DebugPort.setDebugOutput(true);
   	#endif
+	heaterSerial.begin(9600);
 
 	#if SwapSerial == true && UseSoftwareSerial != true
 	Serial.swap();
