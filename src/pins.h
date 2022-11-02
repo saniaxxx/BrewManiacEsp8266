@@ -35,7 +35,7 @@ void btnPrepareRead(void){}
 inline void setHeaterOut(byte v)
 {
 	heaterSerial.begin(9600);
-	heaterSerial.printf("TW%d\n", v * 3500);
+	heaterSerial.printf("TW%d\n", v * 3500 / 100);
 }
 
 inline void setPumpOut(byte v)

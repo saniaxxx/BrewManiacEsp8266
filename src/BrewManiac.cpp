@@ -1499,10 +1499,8 @@ PumpControl pump;
 //*  heating related function
 // *************************
 bool _hopStanding;
-
-bool _physicalHeattingOn;
 byte _heatWindowSize;
-unsigned long _windowStartTime;
+unsigned long previousMillis;
 
 double pidInput;
 double pidSetpoint;
@@ -1659,32 +1657,26 @@ void saveTunning(void)
 unsigned long lastTime;
 #endif
 
-void heatPhysicalOn(void)
+void heatPhysicalOn(byte power)
 {
-	if(!_physicalHeattingOn)
-	{
-		_physicalHeattingOn=true;
+	#if SecondaryHeaterSupport == true
+	bool primary = _gElementInUseMask & PrimaryHeaterMask;
+	bool secondary =_gElementInUseMask & SecondaryHeaterMask;
+	if(primary) setHeaterOut(HIGH);
+	if(secondary) setSecondaryHeaterOut(HIGH);
 
-	    #if SecondaryHeaterSupport == true
-	    bool primary = _gElementInUseMask & PrimaryHeaterMask;
-	    bool secondary =_gElementInUseMask & SecondaryHeaterMask;
-	    if(primary) setHeaterOut(HIGH);
-	    if(secondary) setSecondaryHeaterOut(HIGH);
+	uiHeatingStatus(primary? HeatingStatus_On:HeatingStatus_Off,secondary? HeatingStatus_On:HeatingStatus_Off);
+	wiReportHeater(primary? HeatingStatus_On:HeatingStatus_Off,secondary? HeatingStatus_On:HeatingStatus_Off);
 
-		uiHeatingStatus(primary? HeatingStatus_On:HeatingStatus_Off,secondary? HeatingStatus_On:HeatingStatus_Off);
-		wiReportHeater(primary? HeatingStatus_On:HeatingStatus_Off,secondary? HeatingStatus_On:HeatingStatus_Off);
-
-	    #else
-		setHeaterOut(HIGH);
-		uiHeatingStatus(HeatingStatus_On);
-		wiReportHeater(HeatingStatus_On);
-		#endif
+	#else
+	setHeaterOut(power);
+	uiHeatingStatus(HeatingStatus_On);
+	wiReportHeater(HeatingStatus_On);
+	#endif
 
 #if FakeHeating == true
 	lastTime = gCurrentTimeInMS;
 #endif
-
-	}
 }
 
 void heatPhysicalOff(void)
@@ -1711,11 +1703,7 @@ void heatPhysicalOff(void)
 
 
 #else
-	if(_physicalHeattingOn)
-	{
-		setHeaterOut(LOW);
-		_physicalHeattingOn=false;
-	}
+	setHeaterOut(LOW);
 	if(gIsHeatOn){
 		uiHeatingStatus(HeatingStatus_On_PROGRAM_OFF);
 		wiReportHeater(HeatingStatus_On_PROGRAM_OFF);
@@ -1887,8 +1875,6 @@ void stopHeatingSpargeWater(void)
 void heatInitialize(void)
 {
 	thePID.SetMode(AUTOMATIC);
-
-	_physicalHeattingOn=false;
 	gIsHeatOn=false;
 	gIsHeatProgramOff=false;
 
@@ -1964,11 +1950,6 @@ void heatOn(bool pidmode=true)
 #endif
 	gIsHeatOn = true;
 	gIsHeatProgramOff=false;
-
-	// should run through heating algorithm first
-	// so that the correct symbol can be shown
-	_windowStartTime=millis();
-
 	#if SpargeHeaterSupport
 	requestHeaterOff();
 	#else
@@ -2007,26 +1988,21 @@ void heaterControl(void)
 
 	// heat is ON by requested following.
 	if(IS_TEMP_INVALID(gCurrentTemperature)) {
-		if(_physicalHeattingOn) {
 #if SpargeHeaterSupport
-			requestHeaterOff();
+		requestHeaterOff();
 #else
-			heatPhysicalOff();
+		heatPhysicalOff();
 #endif
-		}
 		return;
 	}
 
 	if(readSetting(PS_HeatOnPump)){
 		if(! pump.isPhysicalOn()){
-			if(_physicalHeattingOn) {
-
-				#if SpargeHeaterSupport
-				requestHeaterOff();
-				#else
-				heatPhysicalOff();
-				#endif
-			}
+			#if SpargeHeaterSupport
+			requestHeaterOff();
+			#else
+			heatPhysicalOff();
+			#endif
 			return;
 		}
 	}
@@ -2102,38 +2078,11 @@ void heaterControl(void)
         DebugPort.print(",");
         DebugPort.println(pidOutput);
 #endif
-
-	// PWM
-  	unsigned long now = millis();
-  	if (now - _windowStartTime > (unsigned long) _heatWindowSize * 250)
-  	{
-    	_windowStartTime += (unsigned long)_heatWindowSize * 250;
-    	//time to shift the Relay Window
-  	}
-
-  	if ((pidOutput / 255) * ((unsigned long)_heatWindowSize * 250) > now - _windowStartTime)
-  	{
-  		if(!_physicalHeattingOn)
-  		{
-  			#if SpargeHeaterSupport
-			requestHeaterOn();
-	  		#else
-   	 		heatPhysicalOn();
-   	 		#endif
-   	 	}
-  	}
-  	else
-  	{
-  		// turn off heat
-  		if(_physicalHeattingOn)
-  		{
-  			#if SpargeHeaterSupport
-			requestHeaterOff();
-	  		#else
-  			heatPhysicalOff();
-  			#endif
-  		}
-  	}
+	unsigned long currentMillis = millis();
+	if(currentMillis - previousMillis > 500) {
+		previousMillis = currentMillis;   
+		heatPhysicalOn(pidOutput * 100 / 255);
+	}
 } // end of heaterControl
 
 void heatThread(void)

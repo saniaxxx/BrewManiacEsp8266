@@ -59,10 +59,7 @@
 #endif
 
 //#define LCD_USE_SSD1306 true
-
-#if SupportDistilling
 #define PwmHeatingSupport true
-#endif
 
 #ifndef EnableLevelSensor
 #define EnableLevelSensor false
